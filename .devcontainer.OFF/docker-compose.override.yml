@@ -1,0 +1,12 @@
+version: '3.9'
+services:
+  api:
+    build:
+      context: ./backend
+    volumes:
+      - ../backend:/workspace/backend:cached
+      - ../frontend:/workspace/frontend:cached
+      - ../data:/workspace/data:cached
+    environment:
+      NODE_ENV: development
+    command: tail -f /dev/null

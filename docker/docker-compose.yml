@@ -11,14 +11,20 @@ services:
     stop_grace_period: 1m
     command: "./wait-for db:3306 --timeout=720 -- nginx -g 'daemon off;'"
     ports:
-      - 80:8080
+      - "8080:8080"
   api:
     environment:
-      MEMPOOL_BACKEND: "none"
-      CORE_RPC_HOST: "172.27.0.1"
+      MEMPOOL_BACKEND: "electrum"
+      CORE_RPC_HOST: "host.docker.internal"
       CORE_RPC_PORT: "8332"
-      CORE_RPC_USERNAME: "mempool"
-      CORE_RPC_PASSWORD: "mempool"
+      CORE_RPC_USERNAME: ""
+      CORE_RPC_PASSWORD: ""
+      CORE_RPC_TIMEOUT: 60000
+      CORE_RPC_COOKIE: true
+      CORE_RPC_COOKIE_PATH: "/root/.bitcoin/.cookie"
+      ELECTRUM_HOST: "192.168.0.3"
+      ELECTRUM_PORT: "50001"
+      ELECTRUM_TLS_ENABLED: "false"
       DATABASE_ENABLED: "true"
       DATABASE_HOST: "db"
       DATABASE_DATABASE: "mempool"
@@ -26,13 +32,16 @@ services:
       DATABASE_PASSWORD: "mempool"
       STATISTICS_ENABLED: "true"
     image: mempool/backend:latest
-    user: "1000:1000"
+    user: "0:0"
     restart: on-failure
     stop_grace_period: 1m
     command: "./wait-for-it.sh db:3306 --timeout=720 --strict -- ./start.sh"
     volumes:
       - ./data:/backend/cache
-  db:
+      - ./backend/.bitcoin/.cookie:/root/.bitcoin/.cookie:ro
+    ports:
+      - "8999:8999"
+  db: 
     environment:
       MYSQL_DATABASE: "mempool"
       MYSQL_USER: "mempool"

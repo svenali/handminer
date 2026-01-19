@@ -88,6 +88,7 @@ export interface Env {
   SERVICES_API?: string;
   customize?: Customization;
   PROD_DOMAINS: string[];
+  HANDMINER_DASHBOARD?: boolean;
 }
 
 const defaultEnv: Env = {
