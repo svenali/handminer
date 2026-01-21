@@ -2,4 +2,45 @@
 
 <hr>
 
-<p>handminer works!</p>
+<div class="handminer-layout">
+
+  <!-- Mempool -->
+  <div class="panel">
+    <h3>Mempool (offene TXs)</h3>
+
+    <div class="tx-list">
+      <div class="tx-row" *ngFor="let tx of mempoolTxs">
+        <div class="txid">{{ tx.txid | slice:0:12 }}…</div>
+        <div class="meta">
+          <span>{{ tx.vsize | number:'1.0-0' }} vB</span>
+          <span>{{ tx.fee }} sat</span>
+          <span>{{ tx.rate | number:'1.2-2' }} sat/vB</span>
+        </div>
+        <button (click)="addToBlock(tx)">➕</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dein Block -->
+  <div class="panel">
+    <h3>Dein Block</h3>
+
+    <div class="block-stats">
+      TXs: {{ blockTxs.length }} |
+      Size: {{ totalVSize | number:'1.0-0' }} vB |
+      Fees: {{ totalFees }} sat
+    </div>
+
+    <div class="tx-list">
+      <div class="tx-row" *ngFor="let tx of blockTxs">
+        <div class="txid">{{ tx.txid | slice:0:12 }}…</div>
+        <div class="meta">
+          <span>{{ tx.vsize | number:'1.0-0' }} vB</span>
+          <span>{{ tx.fee }} sat</span>
+        </div>
+        <button (click)="removeFromBlock(tx)">❌</button>
+      </div>
+    </div>
+  </div>
+
+</div>

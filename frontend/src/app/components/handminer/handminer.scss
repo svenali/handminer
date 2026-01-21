@@ -1,0 +1,41 @@
+.handminer-layout {
+  display: flex;
+  gap: 24px;
+  padding: 16px;
+}
+
+.panel {
+  flex: 1;
+  background: #111;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.tx-list {
+  max-height: 60vh;
+  overflow-y: auto;  /* vertikales Scrollen aktivieren */
+  padding: 5px;
+}
+
+.tx-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 8px;
+  border-bottom: 1px solid #333;
+  font-family: monospace;
+}
+
+.txid {
+  width: 120px;
+}
+
+.meta span {
+  margin-right: 8px;
+  color: #aaa;
+}
+
+.block-stats {
+  margin-bottom: 8px;
+  font-weight: bold;
+}
