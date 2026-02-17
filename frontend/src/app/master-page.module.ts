@@ -120,7 +120,7 @@ const routes: Routes = [
       {
         path: 'tools/calculator',
         component: CalculatorComponent
-      },
+      }
     ],
   }
 ];

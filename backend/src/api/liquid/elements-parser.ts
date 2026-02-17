@@ -5,7 +5,7 @@ import { Common } from '../common';
 import DB from '../../database';
 import logger from '../../logger';
 
-const federationChangeAddresses = ['bc1qxvay4an52gcghxq5lavact7r6qe9l4laedsazz8fj2ee2cy47tlqff4aj4', '3EiAcrzq1cELXScc98KeCswGWZaPGceT1d'];
+const federationChangeAddresses = ['bc1qxvay4an52gcghxq5lavact7r6qe9l4laedsazz8fj2ee2cy47tlqff4aj4', '3EiAcrzq1cELXScc98KeCswGWZaPGceT1d', '3G6neksSBMp51kHJ2if8SeDUrzT8iVETWT', 'bc1qwnevjp8nsq7adu3hxlvdvslrf242q4vuavfg0y929jp2zntp3vgq7cq6z2'];
 const auditBlockOffsetWithTip = 1; // Wait for 1 block confirmation before processing the block in the audit process to reduce the risk of reorgs
 
 class ElementsParser {
@@ -36,6 +36,7 @@ class ElementsParser {
     }
   }
 
+  /** @asyncUnsafe */
   protected async $parseBlock(block: IBitcoinApi.Block) {
     for (const tx of block.tx) {
       await this.$parseInputs(tx, block);
@@ -43,6 +44,7 @@ class ElementsParser {
     }
   }
 
+  /** @asyncUnsafe */
   protected async $parseInputs(tx: IBitcoinApi.Transaction, block: IBitcoinApi.Block) {
     for (const [index, input] of tx.vin.entries()) {
       if (input.is_pegin) {
@@ -51,6 +53,7 @@ class ElementsParser {
     }
   }
 
+  /** @asyncUnsafe */
   protected async $parsePegIn(input: IBitcoinApi.Vin, vindex: number, txid: string, block: IBitcoinApi.Block) {
     const bitcoinTx: IBitcoinApi.Transaction = await bitcoinSecondClient.getRawTransaction(input.txid, true);
     const bitcoinBlock: IBitcoinApi.Block = await bitcoinSecondClient.getBlock(bitcoinTx.blockhash);
@@ -60,6 +63,7 @@ class ElementsParser {
       outputAddress, bitcoinTx.txid, prevout.n, bitcoinBlock.height, bitcoinBlock.time, 1);
   }
 
+  /** @asyncUnsafe */
   protected async $parseOutputs(tx: IBitcoinApi.Transaction, block: IBitcoinApi.Block) {
     for (const output of tx.vout) {
       if (output.scriptPubKey.pegout_chain) {
@@ -74,6 +78,7 @@ class ElementsParser {
     }
   }
 
+  /** @asyncUnsafe */
   protected async $savePegToDatabase(height: number, blockTime: number, amount: number, txid: string,
     txindex: number, bitcoinaddress: string, bitcointxid: string, bitcoinindex: number, bitcoinblock: number, bitcoinBlockTime: number, final_tx: number): Promise<void> {
     const query = `INSERT IGNORE INTO elements_pegs(
@@ -102,12 +107,14 @@ class ElementsParser {
     }
   }
 
+  /** @asyncUnsafe */
   protected async $getLatestBlockHeightFromDatabase(): Promise<number> {
     const query = `SELECT number FROM state WHERE name = 'last_elements_block'`;
     const [rows] = await DB.query(query);
     return rows[0]['number'];
   }
 
+  /** @asyncUnsafe */
   protected async $saveLatestBlockToDatabase(blockHeight: number) {
     const query = `UPDATE state SET number = ? WHERE name = 'last_elements_block'`;
     await DB.query(query, [blockHeight]);
@@ -205,6 +212,7 @@ class ElementsParser {
   }
 
   // Get the UTXOs that need to be scanned in block height (UTXOs that were last updated in the block height - 1)
+  /** @asyncUnsafe */
   protected async $getFederationUtxosToScan(height: number) {
     const query = `SELECT txid, txindex, bitcoinaddress, amount, blocknumber, timelock, expiredAt FROM federation_txos WHERE lastblockupdate = ? AND unspent = 1`;
     const [rows] = await DB.query(query, [height - 1]);
@@ -212,6 +220,7 @@ class ElementsParser {
   }
 
   // Returns the UTXOs that are spent as of tip and need to be scanned
+  /** @asyncUnsafe */
   protected async $getFederationUtxosToParse(utxos: any[]): Promise<any> {
     const spentAsTip: any[] = [];
     const unspentAsTip: any[] = [];
@@ -224,6 +233,7 @@ class ElementsParser {
     return {spentAsTip, unspentAsTip};
   }
 
+  /** @asyncUnsafe */
   protected async $parseBitcoinBlock(block: IBitcoinApi.Block, spentAsTip: any[], unspentAsTip: any[], confirmedTip: number, redeemAddressesData: any[] = []) {
     const redeemAddresses: string[] = redeemAddressesData.map(redeemAddress => redeemAddress.bitcoinaddress);
     for (const tx of block.tx) {
@@ -255,7 +265,7 @@ class ElementsParser {
           // Check that the UTXO was not already added in the DB by previous scans
           const [rows_check] = await DB.query(`SELECT txid FROM federation_txos WHERE txid = ? AND txindex = ?`, [tx.txid, output.n]) as any[];
           if (rows_check.length === 0) {
-            const timelock = output.scriptPubKey.address === federationChangeAddresses[0] ? 4032 : 2016; // P2WSH change address has a 4032 timelock, P2SH change address has a 2016 timelock
+            const timelock = output.scriptPubKey.address === federationChangeAddresses[1] ? 2016 : 4032; // hardcode timelock for 3EiAcrzq... This will be addressed better in the future
             const query_utxos = `INSERT INTO federation_txos (txid, txindex, bitcoinaddress, amount, blocknumber, blocktime, unspent, lastblockupdate, lasttimeupdate, timelock, expiredAt, emergencyKey, pegtxid, pegindex, pegblocktime) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
             const params_utxos: (string | number)[] = [tx.txid, output.n, output.scriptPubKey.address, output.value * 100000000, block.height, block.time, 1, block.height, 0, timelock, 0, 0, '', 0, 0];
             await DB.query(query_utxos, params_utxos);
@@ -306,7 +316,7 @@ class ElementsParser {
 
     for (const utxo of unspentAsTip) {
       if (utxo.expiredAt === 0 && block.height >= utxo.blocknumber + utxo.timelock) { // The UTXO is expiring in this block
-        await DB.query(`UPDATE federation_txos SET unspent = 0, lastblockupdate = ?, expiredAt = ? WHERE txid = ? AND txindex = ?`, [confirmedTip, block.time, utxo.txid, utxo.txindex]);
+        await DB.query(`UPDATE federation_txos SET lastblockupdate = ?, expiredAt = ? WHERE txid = ? AND txindex = ?`, [confirmedTip, block.time, utxo.txid, utxo.txindex]);
       } else if (utxo.expiredAt === 0 && confirmedTip >= utxo.blocknumber + utxo.timelock) { // The UTXO is expiring before the tip: we need to keep track of it
         await DB.query(`UPDATE federation_txos SET lastblockupdate = ? WHERE txid = ? AND txindex = ?`, [utxo.blocknumber + utxo.timelock - 1, utxo.txid, utxo.txindex]);
       } else {
@@ -315,12 +325,14 @@ class ElementsParser {
     }
   }
 
+  /** @asyncUnsafe */
   protected async $saveLastBlockAuditToDatabase(blockHeight: number) {
     const query = `UPDATE state SET number = ? WHERE name = 'last_bitcoin_block_audit'`;
     await DB.query(query, [blockHeight]);
   }
 
   // Get the bitcoin block where the audit process was last updated
+  /** @asyncUnsafe */
   protected async $getAuditProgress(): Promise<any> {
     const lastblockaudit = await this.$getLastBlockAudit();
     const bitcoinBlocksToSync = await this.$getBitcoinBlockchainState();
@@ -331,6 +343,7 @@ class ElementsParser {
   }
 
   // Get the bitcoin blocks remaining to be synced
+  /** @asyncUnsafe */
   protected async $getBitcoinBlockchainState(): Promise<any> {
     const result = await bitcoinSecondClient.getBlockchainInfo();
     return {
@@ -339,12 +352,14 @@ class ElementsParser {
     };
   }
 
+  /** @asyncUnsafe */
   protected async $getLastBlockAudit(): Promise<number> {
     const query = `SELECT number FROM state WHERE name = 'last_bitcoin_block_audit'`;
     const [rows] = await DB.query(query);
     return rows[0]['number'];
   }
 
+  /** @asyncUnsafe */
   protected async $getRedeemAddressesToScan(): Promise<any[]> {
     const query = `SELECT datetime, amount, bitcoinaddress FROM elements_pegs where amount < 0 AND bitcoinaddress != '' AND bitcointxid = '';`;
     const [rows]: any[] = await DB.query(query);
@@ -357,6 +372,7 @@ class ElementsParser {
 
   ///////////// DATA QUERY //////////////
 
+  /** @asyncUnsafe */
   public async $getAuditStatus(): Promise<any> {
     const lastBlockAudit = await this.$getLastBlockAudit();
     const bitcoinBlocksToSync = await this.$getBitcoinBlockchainState();
@@ -368,12 +384,14 @@ class ElementsParser {
     };
   }
 
+  /** @asyncUnsafe */
   public async $getPegDataByMonth(): Promise<any> {
     const query = `SELECT SUM(amount) AS amount, DATE_FORMAT(FROM_UNIXTIME(datetime), '%Y-%m-01') AS date FROM elements_pegs GROUP BY DATE_FORMAT(FROM_UNIXTIME(datetime), '%Y%m')`;
     const [rows] = await DB.query(query);
     return rows;
   }
 
+  /** @asyncUnsafe */
   public async $getFederationReservesByMonth(): Promise<any> {
     const query = `
     SELECT SUM(amount) AS amount, DATE_FORMAT(FROM_UNIXTIME(blocktime), '%Y-%m-01') AS date FROM federation_txos 
@@ -390,6 +408,7 @@ class ElementsParser {
   }
 
   // Get the current L-BTC pegs and the last Liquid block it was updated
+  /** @asyncUnsafe */
   public async $getCurrentLbtcSupply(): Promise<any> {
     const [rows] = await DB.query(`SELECT SUM(amount) AS LBTC_supply FROM elements_pegs;`);
     const lastblockupdate = await this.$getLatestBlockHeightFromDatabase();
@@ -402,6 +421,7 @@ class ElementsParser {
   }
 
   // Get the current reserves of the federation and the last Bitcoin block it was updated
+  /** @asyncUnsafe */
   public async $getCurrentFederationReserves(): Promise<any> {
     const [rows] = await DB.query(`SELECT SUM(amount) AS total_balance FROM federation_txos WHERE unspent = 1 AND expiredAt = 0;`);
     const lastblockaudit = await this.$getLastBlockAudit();
@@ -414,6 +434,7 @@ class ElementsParser {
   }
 
   // Get all of the federation addresses, most balances first
+  /** @asyncUnsafe */
   public async $getFederationAddresses(): Promise<any> {
     const query = `SELECT bitcoinaddress, SUM(amount) AS balance FROM federation_txos WHERE unspent = 1 AND expiredAt = 0 GROUP BY bitcoinaddress ORDER BY balance DESC;`;
     const [rows] = await DB.query(query);
@@ -421,6 +442,7 @@ class ElementsParser {
   }
 
   // Get all of the UTXOs held by the federation, most recent first
+  /** @asyncUnsafe */
   public async $getFederationUtxos(): Promise<any> {
     const query = `SELECT txid, txindex, bitcoinaddress, amount, blocknumber, blocktime, pegtxid, pegindex, pegblocktime, timelock, expiredAt FROM federation_txos WHERE unspent = 1 AND expiredAt = 0 ORDER BY blocktime DESC;`;
     const [rows] = await DB.query(query);
@@ -428,6 +450,7 @@ class ElementsParser {
   }
 
   // Get expired UTXOs, most recent first
+  /** @asyncUnsafe */
   public async $getExpiredUtxos(): Promise<any> {
     const query = `SELECT txid, txindex, bitcoinaddress, amount, blocknumber, blocktime, pegtxid, pegindex, pegblocktime, timelock, expiredAt FROM federation_txos WHERE unspent = 1 AND expiredAt > 0 ORDER BY blocktime DESC;`;
     const [rows]: any[] = await DB.query(query);
@@ -439,6 +462,7 @@ class ElementsParser {
   }
 
     // Get utxos that were spent using emergency keys
+    /** @asyncUnsafe */
     public async $getEmergencySpentUtxos(): Promise<any> {
       const query = `SELECT txid, txindex, bitcoinaddress, amount, blocknumber, blocktime, pegtxid, pegindex, pegblocktime, timelock, expiredAt FROM federation_txos WHERE emergencyKey = 1 ORDER BY blocktime DESC;`;
       const [rows] = await DB.query(query);
@@ -446,6 +470,7 @@ class ElementsParser {
     }
 
   // Get the total number of federation addresses
+  /** @asyncUnsafe */
   public async $getFederationAddressesNumber(): Promise<any> {
     const query = `SELECT COUNT(DISTINCT bitcoinaddress) AS address_count FROM federation_txos WHERE unspent = 1 AND expiredAt = 0;`;
     const [rows] = await DB.query(query);
@@ -453,6 +478,7 @@ class ElementsParser {
   }
 
   // Get the total number of federation utxos
+  /** @asyncUnsafe */
   public async $getFederationUtxosNumber(): Promise<any> {
     const query = `SELECT COUNT(*) AS utxo_count FROM federation_txos WHERE unspent = 1 AND expiredAt = 0;`;
     const [rows] = await DB.query(query);
@@ -460,6 +486,7 @@ class ElementsParser {
   }
 
   // Get the total number of emergency spent utxos and their total amount
+  /** @asyncUnsafe */
   public async $getEmergencySpentUtxosStats(): Promise<any> {
     const query = `SELECT COUNT(*) AS utxo_count, SUM(amount) AS total_amount FROM federation_txos WHERE emergencyKey = 1;`;
     const [rows] = await DB.query(query);
@@ -467,6 +494,7 @@ class ElementsParser {
   }
 
   // Get recent pegs in / out
+  /** @asyncUnsafe */
   public async $getPegsList(count: number = 0): Promise<any> {
     const query = `SELECT txid, txindex, amount, bitcoinaddress, bitcointxid, bitcoinindex, datetime AS blocktime FROM elements_pegs ORDER BY block DESC LIMIT 15 OFFSET ?;`;
     const [rows] = await DB.query(query, [count]);
@@ -474,6 +502,7 @@ class ElementsParser {
   }
 
   // Get all peg in / out from the last month
+  /** @asyncUnsafe */
   public async $getPegsVolumeDaily(): Promise<any> {
     const pegInQuery = await DB.query(`SELECT SUM(amount) AS volume, COUNT(*) AS number FROM elements_pegs WHERE amount > 0 and datetime > UNIX_TIMESTAMP(TIMESTAMPADD(DAY, -1, CURRENT_TIMESTAMP()));`);
     const pegOutQuery = await DB.query(`SELECT SUM(amount) AS volume, COUNT(*) AS number FROM elements_pegs WHERE amount < 0 and datetime > UNIX_TIMESTAMP(TIMESTAMPADD(DAY, -1, CURRENT_TIMESTAMP()));`);
@@ -484,6 +513,7 @@ class ElementsParser {
   }
 
   // Get the total pegs number
+  /** @asyncUnsafe */
   public async $getPegsCount(): Promise<any> {
     const [rows] = await DB.query(`SELECT COUNT(*) AS pegs_count FROM elements_pegs;`);
     return rows[0];
