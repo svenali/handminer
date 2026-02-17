@@ -44,6 +44,7 @@ import redisCache from './api/redis-cache';
 import accelerationApi from './api/services/acceleration';
 import bitcoinCoreRoutes from './api/bitcoin/bitcoin-core.routes';
 import bitcoinSecondClient from './api/bitcoin/bitcoin-second-client';
+import handminerRoutes from './api/handminer/handminer.routes';
 import accelerationRoutes from './api/acceleration/acceleration.routes';
 import aboutRoutes from './api/about.routes';
 import mempoolBlocks from './api/mempool-blocks';
@@ -371,6 +372,9 @@ class Server {
     if (!config.MEMPOOL.OFFICIAL) {
       aboutRoutes.initRoutes(this.app);
     }
+
+    // SVENALI - HANDMINER
+    handminerRoutes.initRoutes(this.app);
   }
 
   healthCheck(): void {
