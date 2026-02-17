@@ -38,7 +38,8 @@
     "test:with-db": "bash ./scripts/test-with-db.sh",
     "lint": "./node_modules/.bin/eslint . --ext .ts",
     "lint:fix": "./node_modules/.bin/eslint . --ext .ts --fix",
-    "prettier": "./node_modules/.bin/prettier --write \"src/**/*.{js,ts}\""
+    "prettier": "./node_modules/.bin/prettier --write \"src/**/*.{js,ts}\"",
+    "watch:build": "npm run tsc -- --watch" 
   },
   "dependencies": {
     "@mempool/electrum-client": "1.1.9",
