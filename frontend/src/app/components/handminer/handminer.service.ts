@@ -11,6 +11,7 @@ export interface MempoolTx {
   rate: number;
   value: number;
   time: number;
+  lastSeen: number;
 }
 
 export interface MempoolTxIds {
@@ -37,6 +38,10 @@ export class HandminerService {
 
   getRecentMempoolTxs(): Observable<MempoolTx[]> {
     return this.http.get<MempoolTx[]>(this.apiBaseUrl + this.apiBasePath + '/api/v1/mempool/recent');
+  }
+
+  getMempoolTX(): Observable<{txs: MempoolTx[]}> {
+    return this.http.get<{txs: MempoolTx[]}>(this.apiBaseUrl + this.apiBasePath + '/api/v1/handminer/mempool');
   }
 
   getAllMempoolTxIds(): Observable<MempoolTxIds[]> {

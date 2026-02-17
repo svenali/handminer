@@ -1,0 +1,39 @@
+<!--- <div class="barrel">
+  <div
+    class="tx-block"
+    *ngFor="let tx of txs; let i = index"
+    [style.transform]="randomTransform(i)"
+    [style.width.px]="blockSize(tx)"
+    [style.height.px]="blockSize(tx)"
+    [style.background]="computeColor(tx.rate)"
+  >
+  </div>
+</div> -->
+ 
+<div class="barrel" 
+  cdkDropList
+  [cdkDropListData]="txs"
+  [cdkDropListConnectedTo]="['blockDropList']"
+  #barrel>
+  
+  <div
+    class="tx-block"
+    *ngFor="let tx of barrelTxs"
+    cdkDrag
+    [cdkDragData]="tx"
+    [style.width.px]="tx.sizePx"
+    [style.height.px]="tx.sizePx"
+    [style.background]="tx.color"
+    [style.transform]="'translate(' + tx.x + 'px,' + tx.y + 'px) rotate(' + tx.rot + 'deg)'"
+  >
+  <!-- 👇 Drag Preview -->
+  <ng-template cdkDragPreview>
+    <div
+      class="tx-preview"
+      [style.width.px]="tx.sizePx"
+      [style.height.px]="tx.sizePx"
+      [style.background]="tx.color"
+    ></div>
+  </ng-template>
+  </div>
+</div>

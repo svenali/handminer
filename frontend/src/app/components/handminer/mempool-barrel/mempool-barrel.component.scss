@@ -1,0 +1,48 @@
+/* .barrel {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 12px;
+  background: #0e0e0e;
+  border-radius: 10px;
+  max-height: 600px;
+  overflow: auto;
+}
+
+.tx-block {
+  border-radius: 4px;
+  cursor: grab;
+  box-shadow: 0 0 6px rgba(255,80,80,.6);
+  transition: transform .1s;
+
+  &:hover {
+    transform: scale(1.1);
+  }
+} */
+
+.barrel {
+  position: relative;
+  width: 100%;
+  height: 360px;
+  overflow: hidden;
+  background: #0b0b0b;
+  border-radius: 12px;
+}
+
+/* .tx-block {
+  position: absolute;
+  border-radius: 3px;
+  opacity: 0.9;
+  box-shadow: 0 0 6px rgba(0,0,0,.6);
+  transition: transform 200ms ease;
+} */
+
+.tx-block {
+  position: absolute;
+  transition: transform 1400ms cubic-bezier(.15,.9,.25,1);
+  will-change: transform;
+}
+
+.tx-block.cdk-drag-placeholder {
+  opacity: 0;
+}

@@ -1,11 +1,8 @@
-<app-start></app-start>
-
-<hr>
+<div class="tx-row">Handminer - Find your blocks by hand and earn BTC</div>
 
 <div class="handminer-layout">
-
   <!-- Mempool -->
-  <div class="panel">
+  <!--- <div class="panel">
     <h3>Mempool (offene TXs)</h3>
 
     <div class="tx-list">
@@ -19,10 +16,21 @@
         <button (click)="addToBlock(tx)">➕</button>
       </div>
     </div>
+  </div> --->
+
+  <div class="panel">
+    <h3>Mempool Barrel (offene TX)</h3>
+    <mempool-barrel [txs]="mempoolTxs" [fillLevel]="fillLevel"></mempool-barrel>
   </div>
 
-  <!-- Dein Block -->
-  <div class="panel">
+  <!-- Dein Block --->
+  <div class="panel block"
+  cdkDropList
+  [cdkDropListData]="blockTxs"
+  #blockDropList="cdkDropList"
+  id="blockDropList"
+  (cdkDropListDropped)="onDropToBlock($event)">
+
     <h3>Dein Block</h3>
 
     <div class="block-stats">
@@ -42,5 +50,25 @@
       </div>
     </div>
   </div>
+</div> 
 
-</div>
+<!--- <div
+  class="panel block"
+  cdkDropList
+  [cdkDropListData]="blockTxs"
+  (cdkDropListDropped)="onDropToBlock($event)"
+>
+  <h3>Dein Block</h3>
+
+  <div class="tx-list">
+    <div class="tx-row" *ngFor="let tx of blockTxs">
+      <div class="txid">{{ tx.txid | slice:0:12 }}…</div>
+      <div class="meta">
+        <span>{{ tx.vsize }} vB</span>
+        <span>{{ tx.fee }} sat</span>
+      </div>
+    </div>
+  </div>
+</div>-->
+
+<app-start></app-start>
