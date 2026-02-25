@@ -12,9 +12,11 @@ const controller = new HandminerController();
 class HandminerRoutes {
   public initRoutes(app: Application) {
     const path = config.MEMPOOL.API_URL_PREFIX + 'handminer/mempool';
+    const last_blockhash_path = config.MEMPOOL.API_URL_PREFIX + 'handminer/tip';
     console.log("Registering route:", path);
 
     app.get(path, controller.getMempool);
+    app.get(last_blockhash_path, controller.getTipHash);
   }
 }
 
