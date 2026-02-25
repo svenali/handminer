@@ -12,9 +12,10 @@
 }
 
 .tx-list {
-  max-height: 60vh;
+  max-height: 20vh;
   overflow-y: auto;  /* vertikales Scrollen aktivieren */
   padding: 5px;
+  background-color: #1a3401;
 }
 
 .tx-row {
@@ -24,6 +25,12 @@
   padding: 6px 8px;
   border-bottom: 1px solid #333;
   font-family: monospace;
+}
+
+.bt-row {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
 }
 
 .txid {

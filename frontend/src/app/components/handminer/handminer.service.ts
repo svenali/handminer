@@ -52,6 +52,14 @@ export class HandminerService {
     return this.http.get<MempoolTx>(this.apiBaseUrl + this.apiBasePath + '/api/v1/mempool/tx/' + txid);
   }
 
+  getTipHash(): Observable<{ hash: string; height: number }> {
+    return this.http.get<{ hash: string; height: number }>(
+      this.apiBaseUrl +
+      this.apiBasePath +
+      '/api/v1/handminer/tip'
+    );
+  }
+
   /* getAllMempoolTxs(): Observable<MempoolTx[]> {
     return this.http.get<MempoolTx[]>(this.apiBaseUrl + this.apiBasePath + '/api/v1/mempool/txs');
   } */
