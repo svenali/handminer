@@ -58,3 +58,8 @@ services:
     stop_grace_period: 1m
     volumes:
       - ./mysql/data:/var/lib/mysql
+    healthcheck: 
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "mempool", "-pmempool"] 
+      interval: 5s 
+      timeout: 5s 
+      retries: 10
