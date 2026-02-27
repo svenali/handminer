@@ -1,0 +1,5 @@
+docker/mysql
+docker/mysql/*
+docker/data
+node_modules
+.git
