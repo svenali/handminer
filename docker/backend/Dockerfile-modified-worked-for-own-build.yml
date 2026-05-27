@@ -1,0 +1,25 @@
+# Wir nehmen direkt das Rust-Image als Basis (enthält Cargo, Rustc etc.)
+FROM rust:1.84-bookworm
+
+# Node.js 22 Umgebung installieren
+RUN apt-get update && \
+    apt-get install -y curl ca-certificates && \
+    curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
+    apt-get install -y nodejs=22.14.0-1nodesource1 build-essential python3 pkg-config && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Arbeitsverzeichnis festlegen
+WORKDIR /backend
+
+# Wir kopieren KEINEN Code, um Platz und Zeit zu sparen.
+# Wir setzen nur die Rechte für den User 1000 (Sven)
+RUN chown -R 1000:1000 /backend
+
+USER 1000
+
+EXPOSE 8999
+
+# Das Start-Skript wird über das Volume kommen und hier ausgeführt
+CMD ["/backend/start.sh"]
+

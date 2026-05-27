@@ -1,0 +1,83 @@
+version: "3.7"
+
+services:
+  web:
+    environment:
+      FRONTEND_HTTP_PORT: "8080"
+      BACKEND_MAINNET_HTTP_HOST: "api"
+    image: mempool/frontend:latest
+    user: "1000:1000"
+    restart: on-failure
+    stop_grace_period: 1m
+    command: "./wait-for db:3306 --timeout=720 -- nginx -g 'daemon off;'"
+    ports:
+      - "8080:8080"
+  api:
+    environment:
+      MEMPOOL_BACKEND: "electrum"
+      MEMPOOL_CACHE_DIR: /backend/cache 
+      MEMPOOL_CACHE_ENABLED: true
+      CORE_RPC_HOST: "host.docker.internal"
+      CORE_RPC_PORT: "8332"
+      CORE_RPC_USERNAME: ""
+      CORE_RPC_PASSWORD: ""
+      CORE_RPC_TIMEOUT: 60000
+      CORE_RPC_COOKIE: true
+      CORE_RPC_COOKIE_PATH: "/root/.bitcoin/.cookie"
+      ELECTRUM_HOST: "192.168.0.3"
+      ELECTRUM_PORT: "50001"
+      ELECTRUM_TLS_ENABLED: "false"
+      DATABASE_ENABLED: "true"
+      DATABASE_HOST: "db"
+      DATABASE_DATABASE: "mempool"
+      DATABASE_USERNAME: "mempool"
+      DATABASE_PASSWORD: "mempool"
+      STATISTICS_ENABLED: "true"
+    build:
+      context: ../
+      dockerfile: docker/backend/Dockerfile
+    user: "0:0"
+    restart: on-failure
+    stop_grace_period: 1m
+    command: >
+      sh -c "cp /backend/config/mempool-config.json /backend/mempool-config.json &&
+             /backend/wait-for-it.sh db:3306 --timeout=720 --strict -- /backend/start.sh"
+
+    volumes:
+      # 1. Den Code (dist) wie gehabt
+      - ../backend/dist:/backend/package
+
+      # 2. WICHTIG: Mount den ÜBERGEORDNETEN Ordner nach /backend/config
+      # (Annahme: mempool-config.json liegt lokal in ../backend/)
+      - ../backend:/backend/config
+
+      # WICHTIG: Die Bibliotheken von deinem Mac in den Container spiegeln
+      - ../backend/node_modules:/backend/node_modules
+      - ../backend/node_modules:/backend/package/node_modules
+
+      # Diese Zeile ist der Schlüssel:
+      # Wir spiegeln deinen Rust-Ordner direkt dorthin, wo Node das Modul sucht
+      - ../rust/gbt:/backend/node_modules/rust-gbt
+
+      # 3. Scripte
+      - ../backend/start.sh:/backend/start.sh
+      - ../backend/wait-for-it.sh:/backend/wait-for-it.sh
+
+      # 4. Cache und Cookie
+      - ./data:/backend/cache
+      - ../backend/.bitcoin/.cookie:/root/.bitcoin/.cookie:ro
+    ports:
+      - "8999:8999"
+  db: 
+    environment:
+      MYSQL_DATABASE: "mempool"
+      MYSQL_USER: "mempool"
+      MYSQL_PASSWORD: "mempool"
+      MYSQL_ROOT_PASSWORD: "admin"
+      MARIADB_AUTO_UPGRADE: "1"
+    image: mariadb:10.5.21
+    user: "1000:1000"
+    restart: on-failure
+    stop_grace_period: 1m
+    volumes:
+      - ./mysql/data:/var/lib/mysql

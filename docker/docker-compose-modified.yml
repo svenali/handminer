@@ -1,0 +1,58 @@
+version: "3.7"
+
+services:
+  web:
+    environment:
+      FRONTEND_HTTP_PORT: "8080"
+      BACKEND_MAINNET_HTTP_HOST: "api"
+    image: mempool/frontend:latest
+    user: "1000:1000"
+    restart: on-failure
+    stop_grace_period: 1m
+    command: "./wait-for db:3306 --timeout=720 -- nginx -g 'daemon off;'"
+    ports:
+      - "8080:8080"
+  api:
+    environment:
+      MEMPOOL_BACKEND: "electrum"
+      CORE_RPC_HOST: "host.docker.internal"
+      CORE_RPC_PORT: "8332"
+      CORE_RPC_USERNAME: ""
+      CORE_RPC_PASSWORD: ""
+      CORE_RPC_TIMEOUT: 60000
+      CORE_RPC_COOKIE: true
+      CORE_RPC_COOKIE_PATH: "/root/.bitcoin/.cookie"
+      ELECTRUM_HOST: "192.168.0.3"
+      ELECTRUM_PORT: "50001"
+      ELECTRUM_TLS_ENABLED: "false"
+      DATABASE_ENABLED: "true"
+      DATABASE_HOST: "db"
+      DATABASE_DATABASE: "mempool"
+      DATABASE_USERNAME: "mempool"
+      DATABASE_PASSWORD: "mempool"
+      STATISTICS_ENABLED: "true"
+    build:
+      context: ..
+      dockerfile: docker/backend/Dockerfile
+    user: "0:0"
+    restart: on-failure
+    stop_grace_period: 1m
+    command: sh -c "./wait-for-it.sh db:3306 --timeout=720 --strict -- npx ts-node-dev --respawn --transpile-only src/server.ts"
+    volumes:
+      - ./data:/backend/cache
+      - ./backend/.bitcoin/.cookie:/root/.bitcoin/.cookie:ro
+    ports:
+      - "8999:8999"
+  db: 
+    environment:
+      MYSQL_DATABASE: "mempool"
+      MYSQL_USER: "mempool"
+      MYSQL_PASSWORD: "mempool"
+      MYSQL_ROOT_PASSWORD: "admin"
+      MARIADB_AUTO_UPGRADE: "1"
+    image: mariadb:10.5.21
+    user: "1000:1000"
+    restart: on-failure
+    stop_grace_period: 1m
+    volumes:
+      - ./mysql/data:/var/lib/mysql
