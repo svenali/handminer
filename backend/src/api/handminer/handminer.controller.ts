@@ -10,8 +10,7 @@ export class HandminerController {
   public getMempool(req: Request, res: Response) {
     console.log('HandminerController.getMempool called');
     if (!mempool.isInSync()) {
-      res.statusCode = 503;
-      res.send('Service Unavailable');
+      res.status(503).send('Service Unavailable');
       return;
     }
     const raw = mempool.getMempool();

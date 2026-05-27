@@ -155,10 +155,10 @@ class Server {
     }
 
     this.server = http.createServer(this.app);
-    this.wss = new WebSocket.Server({ server: this.server });
+    this.wss = new WebSocket.Server({ server: this.server, maxPayload: websocketHandler.MAX_MESSAGE_SIZE });
     if (config.MEMPOOL.UNIX_SOCKET_PATH) {
       this.serverUnixSocket = http.createServer(this.app);
-      this.wssUnixSocket = new WebSocket.Server({ server: this.serverUnixSocket });
+      this.wssUnixSocket = new WebSocket.Server({ server: this.serverUnixSocket, maxPayload: websocketHandler.MAX_MESSAGE_SIZE });
     }
 
     this.setUpWebsocketHandling();
@@ -326,7 +326,6 @@ class Server {
       blocks.setNewBlockCallback(async () => {
         try {
           await elementsParser.$parse();
-          await elementsParser.$updateFederationUtxos();
         } catch (e) {
           logger.warn('Elements parsing error: ' + (e instanceof Error ? e.message : e));
         }
@@ -336,7 +335,6 @@ class Server {
     if (config.MEMPOOL.ENABLED) {
       statistics.setNewStatisticsEntryCallback(websocketHandler.handleNewStatistic.bind(websocketHandler));
       memPool.setAsyncMempoolChangedCallback(websocketHandler.$handleMempoolChange.bind(websocketHandler));
-      blocks.setNewAsyncBlockCallback(websocketHandler.handleNewBlock.bind(websocketHandler));
     }
     if (config.FIAT_PRICE.ENABLED) {
       priceUpdater.setRatesChangedCallback(websocketHandler.handleNewConversionRates.bind(websocketHandler));

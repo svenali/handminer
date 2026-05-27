@@ -2,10 +2,13 @@ name: Backend Integration Tests with MariaDB
 
 on:
   pull_request:
-    types: [opened, review_requested, synchronize]
+    types: [opened, synchronize]
   push:
     branches:
       - master
+
+permissions:
+  contents: read
 
 jobs:
   backend-integration:
