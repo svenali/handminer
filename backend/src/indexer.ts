@@ -139,12 +139,12 @@ class Indexer {
     switch (task) {
       case 'blocksPrices': {
         if (!['testnet', 'signet', 'testnet4', 'regtest'].includes(config.MEMPOOL.NETWORK) && config.FIAT_PRICE.ENABLED) {
-          let lastestPriceId;
+          let latestPriceId;
           try {
-            lastestPriceId = await PricesRepository.$getLatestPriceId();
+            latestPriceId = await PricesRepository.$getLatestPriceId();
           } catch (e) {
             logger.debug('failed to fetch latest price id from db: ' + (e instanceof Error ? e.message : e));
-          }          if (priceUpdater.historyInserted === false || lastestPriceId === null) {
+          }          if (priceUpdater.historyInserted === false || latestPriceId === null) {
             logger.debug(`Blocks prices indexer is waiting for the price updater to complete`, logger.tags.mining);
             this.scheduleSingleTask(task, 10000);
           } else {
@@ -220,6 +220,7 @@ class Indexer {
       await blocks.$generateBlocksSummariesDatabase();
       await blocks.$generateCPFPDatabase();
       await blocks.$generateAuditStats();
+      await blocks.$indexBlocksFirstSeen();
       await auditReplicator.$sync();
       await statisticsReplicator.$sync();
       await AccelerationRepository.$indexPastAccelerations();
