@@ -1,6 +1,7 @@
 import { Component, OnInit, AfterViewInit, OnDestroy, HostListener, ViewChild, ElementRef, Inject, ChangeDetectorRef } from '@angular/core';
 import { ElectrsApiService } from '@app/services/electrs-api.service';
 import { ActivatedRoute, ParamMap, Router } from '@angular/router';
+import { TransactionsListComponent } from '@components/transactions-list/transactions-list.component';
 import {
   switchMap,
   filter,
@@ -13,7 +14,9 @@ import {
   retry,
   startWith,
   repeat,
-  take
+  take,
+  debounceTime,
+  distinctUntilChanged
 } from 'rxjs/operators';
 import { Transaction } from '@interfaces/electrs.interface';
 import { of, merge, Subscription, Observable, Subject, from, throwError, combineLatest, BehaviorSubject, timer } from 'rxjs';
@@ -116,7 +119,7 @@ export class TransactionComponent implements OnInit, AfterViewInit, OnDestroy {
   isAcceleration: boolean = false;
   accelerationCanceled: boolean = false;
   filters: Filter[] = [];
-  showCpfpDetails = false;
+  cpfpMode: boolean = false;
   miningStats: MiningStats;
   fetchCpfp$ = new Subject<string>();
   transactionTimes$ = new Subject<string>();
@@ -142,6 +145,7 @@ export class TransactionComponent implements OnInit, AfterViewInit, OnDestroy {
   hideFlow: boolean = this.stateService.hideFlow.value;
   overrideFlowPreference: boolean = null;
   flowEnabled: boolean;
+  isDetailsOpen: boolean = false;
   tooltipPosition: { x: number, y: number };
   isMobile: boolean;
   firstLoad = true;
@@ -165,9 +169,19 @@ export class TransactionComponent implements OnInit, AfterViewInit, OnDestroy {
   hasAccelerationDetails = false;
   auditEnabled: boolean = this.stateService.env.AUDIT && this.stateService.env.BASE_MODULE === 'mempool' && this.stateService.env.MINING_DASHBOARD === true;
   isMempoolSpaceBuild = this.stateService.isMempoolSpaceBuild;
-  referralCode: string | undefined;
+  partnerCode: string | undefined;
 
   graphContainer: ElementRef;
+  private txList: TransactionsListComponent;
+
+  @ViewChild('txList')
+  set txListSetter(component: TransactionsListComponent | undefined) {
+    if (component) {
+      this.txList = component;
+      this.txList.setDetailsOpen(this.isDetailsOpen);
+    }
+  }
+
   @ViewChild('graphContainer')
   set flowAnchor(element: ElementRef | null | undefined) {
     if (element) {
@@ -178,6 +192,13 @@ export class TransactionComponent implements OnInit, AfterViewInit, OnDestroy {
 
   @ViewChild('accelerate')
   set accelerateAnchor(element: ElementRef | null | undefined) {
+    if (element) {
+      setTimeout(() => { this.applyFragment(); }, 0);
+    }
+  }
+
+  @ViewChild('cluster')
+  set clusterAnchor(element: ElementRef | null | undefined) {
     if (element) {
       setTimeout(() => { this.applyFragment(); }, 0);
     }
@@ -206,17 +227,19 @@ export class TransactionComponent implements OnInit, AfterViewInit, OnDestroy {
 
   ngOnInit() {
     this.enterpriseService.page();
+    this.isDetailsOpen = this.route.snapshot.queryParams['showDetails'] === 'true';
+    this.cpfpMode = this.isCpfpParamEnabled(this.route.snapshot.queryParams['cpfp']);
 
     const urlParams = new URLSearchParams(window.location.search);
     this.forceAccelerationSummary = !!urlParams.get('cash_request_id');
 
-    // Accelerator referral code
+    // Accelerator partner code
     const fragmentsParams = new URLSearchParams(window.location.hash.slice(1));
-    this.referralCode = fragmentsParams.get('referralCode') ?? this.storageService.getValue('referralCode') ?? undefined;
-    if (this.referralCode) {
-      this.storageService.setValue('referralCode', this.referralCode);
-      // Cleanup referralCode from url after storing it in localStorage to avoid re-use upon page reload
-      window.location.hash = window.location.hash.replace(`&referralCode=${this.referralCode}`, '').replace(`#referralCode=${this.referralCode}`, '');
+    this.partnerCode = fragmentsParams.get('partnerCode') ?? this.storageService.getValue('partnerCode') ?? undefined;
+    if (this.partnerCode) {
+      this.storageService.setValue('partnerCode', this.partnerCode);
+      // Cleanup partnerCode from url after storing it in localStorage to avoid re-use upon page reload
+      window.location.hash = window.location.hash.replace(`&partnerCode=${this.partnerCode}`, '').replace(`#partnerCode=${this.partnerCode}`, '');
     }
 
     this.hideAccelerationSummary = this.stateService.isMempoolSpaceBuild ? this.storageService.getValue('hide-accelerator-pref') == 'true' : true;
@@ -619,6 +642,7 @@ export class TransactionComponent implements OnInit, AfterViewInit, OnDestroy {
           const seoDescription = seoDescriptionNetwork(this.stateService.network);
           this.seoService.setDescription($localize`:@@meta.description.bitcoin.transaction:Get real-time status, addresses, fees, script info, and more for ${network}${seoDescription} transaction with txid ${this.txId}.`);
           this.resetTransaction();
+
           return merge(
             of(true),
             this.stateService.connectionState$.pipe(
@@ -834,6 +858,9 @@ export class TransactionComponent implements OnInit, AfterViewInit, OnDestroy {
       this.txChanged$,
     ]).pipe(
       map(([position, mempoolBlocks, da, isAccelerated]) => {
+        if (!this.tx || !position || position.txid !== this.tx.txid) {
+          return null;
+        }
         return this.etaService.calculateETA(
           this.network,
           this.tx,
@@ -844,12 +871,27 @@ export class TransactionComponent implements OnInit, AfterViewInit, OnDestroy {
           isAccelerated,
           this.accelerationPositions,
         );
+      }),
+      distinctUntilChanged((prev: ETA | null, curr: ETA | null) => {
+        return prev === curr || (prev && curr && prev.time === curr.time && prev.blocks === curr.blocks);
       })
     );
   }
 
   ngAfterViewInit(): void {
     this.setGraphSize();
+  }
+
+  toggleDetailsFromTxPage(): void {
+    this.isDetailsOpen = !this.isDetailsOpen;
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { showDetails: this.isDetailsOpen ? 'true' : null },
+      queryParamsHandling: 'merge',
+      preserveFragment: true,
+      replaceUrl: true,
+    });
+    this.txList?.setDetailsOpen(this.isDetailsOpen);
   }
 
   dismissAccelAlert(): void {
@@ -1056,7 +1098,6 @@ export class TransactionComponent implements OnInit, AfterViewInit, OnDestroy {
     this.rbfInfo = null;
     this.rbfReplaces = [];
     this.filters = [];
-    this.showCpfpDetails = false;
     this.showAccelerationDetails = false;
     this.accelerationFlowCompleted = false;
     this.accelerationInfo = null;
@@ -1066,6 +1107,8 @@ export class TransactionComponent implements OnInit, AfterViewInit, OnDestroy {
     this.pool = null;
     this.auditStatus = null;
     this.accelerationPositions = null;
+    this.isDetailsOpen = this.route.snapshot.queryParams['showDetails'] === 'true';
+    this.cpfpMode = this.isCpfpParamEnabled(this.route.snapshot.queryParams['cpfp']);
     document.body.scrollTo(0, 0);
     this.isAcceleration = false;
     this.isAccelerated$.next(this.isAcceleration);
@@ -1081,6 +1124,45 @@ export class TransactionComponent implements OnInit, AfterViewInit, OnDestroy {
   setupGraph() {
     this.maxInOut = Math.min(this.inOutLimit, Math.max(this.tx?.vin?.length || 1, this.tx?.vout?.length + 1 || 1));
     this.graphHeight = this.graphExpanded ? this.maxInOut * 15 : Math.min(360, this.maxInOut * 80);
+  }
+
+  toggleCpfp() {
+    this.cpfpMode = !this.cpfpMode;
+    if (this.cpfpInfo?.cluster) {
+      this.router.navigate([], {
+        relativeTo: this.route,
+        queryParams: { cpfp: this.cpfpMode ? 'true' : null },
+        queryParamsHandling: 'merge',
+        fragment: this.getCpfpFragment(),
+        replaceUrl: true,
+      });
+    } else {
+      this.router.navigate([], {
+        relativeTo: this.route,
+        queryParams: { cpfp: this.cpfpMode ? 'simple' : null },
+        queryParamsHandling: 'merge',
+        preserveFragment: true,
+        replaceUrl: true,
+      });
+    }
+  }
+
+  private isCpfpParamEnabled(cpfpParam: string | undefined): boolean {
+    return cpfpParam === 'true' || cpfpParam === 'advanced' || cpfpParam === 'simple';
+  }
+
+  private getCpfpFragment(): string | null {
+    const currentParams = new URLSearchParams(this.fragmentParams?.toString() || this.route.snapshot.fragment || '');
+    const fragmentParams = new URLSearchParams();
+    if (this.cpfpMode) {
+      fragmentParams.set('cluster', '');
+    }
+    for (const [key, value] of currentParams.entries()) {
+      if (key !== 'cluster') {
+        fragmentParams.set(key, value);
+      }
+    }
+    return fragmentParams.toString() || null;
   }
 
   toggleGraph() {
@@ -1155,20 +1237,20 @@ export class TransactionComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   onAccelerationCompleted(): void {
-    this.router.navigate([], { fragment: null });
+    this.router.navigate([], { fragment: null, queryParamsHandling: 'merge' });
     this.accelerationFlowCompleted = true;
     this.forceAccelerationSummary = false;
   }
 
   closeAccelerator(): void {
-    this.router.navigate([], { fragment: null });
+    this.router.navigate([], { fragment: null, queryParamsHandling: 'merge' });
     this.hideAccelerationSummary = true;
     this.forceAccelerationSummary = false;
     this.storageService.setValue('hide-accelerator-pref', 'true');
   }
 
   openAccelerator(): void {
-    this.router.navigate([], { fragment: 'accelerate' });
+    this.router.navigate([], { fragment: 'accelerate', queryParamsHandling: 'merge' });
     this.accelerationFlowCompleted = false;
     this.hideAccelerationSummary = false;
     this.storageService.setValue('hide-accelerator-pref', 'false');
